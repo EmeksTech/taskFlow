@@ -1,0 +1,95 @@
+{
+  "tasks": [
+    {
+      "id": "1",
+      "title": "Redesign onboarding flow",
+      "description": "Simplify the first-run experience and improve activation across the welcome steps.",
+      "assignee": "Maya Johnson",
+      "category": "Growth",
+      "dueDate": "2026-11-18",
+      "priority": "High",
+      "status": "Completed"
+    },
+    {
+      "id": "2",
+      "title": "Update product roadmap",
+      "description": "Align the Q4 roadmap with the latest customer feedback and engineering estimates.",
+      "assignee": "Ethan Kim",
+      "category": "Product",
+      "dueDate": "2026-11-17",
+      "priority": "Medium",
+      "status": "In Progress"
+    },
+    {
+      "id": "3",
+      "title": "Launch email campaign",
+      "description": "Finalize the launch sequence and coordinate the release announcement.",
+      "assignee": "Sofia Turner",
+      "category": "Marketing",
+      "dueDate": "2026-11-13",
+      "priority": "High",
+      "status": "In Progress"
+    },
+    {
+      "id": "4",
+      "title": "Build billing settings page",
+      "description": "Add the billing contact, payment method, and invoice history sections.",
+      "assignee": "Ava Lee",
+      "category": "Product",
+      "dueDate": "2026-11-12",
+      "priority": "High",
+      "status": "Pending"
+    },
+    {
+      "id": "5",
+      "title": "Prepare customer feedback survey",
+      "description": "Draft a short survey for customers who completed onboarding this month.",
+      "assignee": "Ravi Kapoor",
+      "category": "Research",
+      "dueDate": "2026-11-20",
+      "priority": "Low",
+      "status": "Pending"
+    },
+    {
+      "id": "6",
+      "title": "QA mobile navigation",
+      "description": "Verify keyboard and touch interactions across supported mobile breakpoints.",
+      "assignee": "Maya Johnson",
+      "category": "Design system",
+      "dueDate": "2026-11-11",
+      "priority": "High",
+      "status": "Completed"
+    },
+    {
+      "id": "7",
+      "title": "Schedule customer interviews",
+      "description": "Book five research calls with teams that recently adopted TaskFlow.",
+      "assignee": "Sofia Turner",
+      "category": "Research",
+      "dueDate": "2026-11-10",
+      "priority": "Medium",
+      "status": "Completed"
+    },
+    {
+      "id": "8",
+      "title": "Write release notes v2.4",
+      "description": "Summarize the latest product updates for the upcoming release.",
+      "assignee": "Ethan Kim",
+      "category": "Product",
+      "dueDate": "2026-11-09",
+      "priority": "Low",
+      "status": "Completed"
+    },
+    {
+      "title": "Testing out the tasls",
+      "description": "Hello world",
+      "assignee": "John",
+      "category": "Product Design",
+      "priority": "Medium",
+      "status": "Pending",
+      "dueDate": "2026-11-22",
+      "id": "rWNIQuToHOY"
+    }
+  ],
+  "$schema": "./node_modules/json-server/schema.json"
+}
