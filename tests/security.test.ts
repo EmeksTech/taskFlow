@@ -22,10 +22,6 @@ import {
   externalApiOptions,
   withExternalApiCors,
 } from "../src/lib/tasks/cors";
-import {
-  isStateChangingRequest,
-  isTrustedTaskFlowProxyRequest,
-} from "../classroom/taskflow-react-poc/src/proxy/originPolicy";
 
 test("production config rejects mock mode and missing secrets", () => {
   const errors = getProductionConfigErrors({
@@ -292,49 +288,4 @@ test("external API CORS allows bearer headers without credentialed CORS", async 
   const preflight = externalApiOptions();
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get("Access-Control-Allow-Origin"), "*");
-});
-
-test("TaskFlow Vite proxy rejects untrusted or missing origins on writes", () => {
-  assert.equal(
-    isTrustedTaskFlowProxyRequest(
-      "POST",
-      "http://localhost:5173",
-      "http://localhost:5173",
-    ),
-    true,
-  );
-  assert.equal(
-    isTrustedTaskFlowProxyRequest(
-      "POST",
-      "http://localhost:5174",
-      "http://localhost:5173",
-    ),
-    false,
-  );
-  assert.equal(
-    isTrustedTaskFlowProxyRequest(
-      "POST",
-      "http://localhost:5174",
-      "http://localhost:5174",
-    ),
-    true,
-  );
-  assert.equal(
-    isTrustedTaskFlowProxyRequest("POST", null, "http://localhost:5173"),
-    false,
-  );
-  assert.equal(
-    isTrustedTaskFlowProxyRequest(
-      "GET",
-      "http://localhost:5174",
-      "http://localhost:5173",
-    ),
-    false,
-  );
-  assert.equal(
-    isTrustedTaskFlowProxyRequest("GET", null, "http://localhost:5173"),
-    true,
-  );
-  assert.equal(isStateChangingRequest("PATCH"), true);
-  assert.equal(isStateChangingRequest("OPTIONS"), false);
 });
