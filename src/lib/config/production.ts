@@ -1,3 +1,5 @@
+import { parseTrustedOrigins } from "./origins";
+
 export function getProductionConfigErrors(
   env: Record<string, string | undefined>,
 ) {
@@ -40,6 +42,14 @@ export function getProductionConfigErrors(
 
   if (env.AUTH_TRUST_HOST?.trim() && env.AUTH_TRUST_HOST !== "true") {
     errors.push('AUTH_TRUST_HOST must be set to "true".');
+  }
+
+  try {
+    parseTrustedOrigins(env.TASKFLOW_ALLOWED_ORIGINS);
+  } catch {
+    errors.push(
+      "TASKFLOW_ALLOWED_ORIGINS must be a comma-separated list of bare HTTP or HTTPS origins.",
+    );
   }
 
   return errors;

@@ -2,10 +2,21 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getTasks } from "@/services/taskService";
-import type { Task } from "@/types/task";
+import type {
+  PaginatedTasks,
+  Task,
+  TaskListQuery,
+} from "@/types/task";
 
-export function useTasks() {
+function getTaskListResult(result: Task[] | PaginatedTasks) {
+  return Array.isArray(result)
+    ? { tasks: result, pageInfo: null }
+    : { tasks: result.tasks, pageInfo: result };
+}
+
+export function useTasks(query?: TaskListQuery) {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [pageInfo, setPageInfo] = useState<PaginatedTasks | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -14,7 +25,9 @@ export function useTasks() {
     setError(null);
 
     try {
-      setTasks(await getTasks());
+      const result = getTaskListResult(await getTasks(query));
+      setTasks(result.tasks);
+      setPageInfo(result.pageInfo);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -24,14 +37,18 @@ export function useTasks() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [query]);
 
   useEffect(() => {
     let isCurrent = true;
 
-    getTasks()
-      .then((loadedTasks) => {
-        if (isCurrent) setTasks(loadedTasks);
+    getTasks(query)
+      .then((result) => {
+        if (isCurrent) {
+          const loaded = getTaskListResult(result);
+          setTasks(loaded.tasks);
+          setPageInfo(loaded.pageInfo);
+        }
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
@@ -49,7 +66,7 @@ export function useTasks() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [query]);
 
-  return { tasks, setTasks, isLoading, error, reload };
+  return { tasks, pageInfo, isLoading, error, reload };
 }

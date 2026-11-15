@@ -1,0 +1,1198 @@
+{
+  "info": {
+    "_postman_id": "56ec425f-2acd-4a58-a3b6-a68d6e1d7ec1",
+    "name": "TaskFlow Classroom API",
+    "description": "Auth.js Credentials, owner-scoped tasks, and Bearer API checks. Defaults to the local TaskFlow backend at localhost:3100. Set secrets only in the local Postman environment and use disposable test accounts and tasks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3100" },
+    { "key": "apiOrigin", "value": "http://localhost:3100" },
+    { "key": "callbackUrl", "value": "http://localhost:3100/" },
+    { "key": "csrfToken", "value": "" },
+    { "key": "taskId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "A - Authentication",
+      "item": [
+        {
+          "name": "Register student account",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{apiOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{registrationName}}\",\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"{{registrationPassword}}\",\n  \"confirmPassword\": \"{{registrationConfirmPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/register",
+            "description": "Creates an account on the selected TaskFlow backend. Store test credentials only in the local Postman environment. Registration does not sign in or issue a personal access token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Registration returns 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Only public user fields are returned', function () { const body = pm.response.json(); pm.expect(body).to.have.property('id'); pm.expect(body).to.have.property('email'); pm.expect(body).not.to.have.property('password'); pm.expect(body).not.to.have.property('passwordHash'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get authentication providers",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/providers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "providers"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Providers endpoint returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Credentials provider is available', function () { pm.expect(pm.response.json()).to.have.property('credentials'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get CSRF token",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/csrf",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "csrf"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('CSRF endpoint returns 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.csrfToken).to.be.a('string').and.not.empty;",
+                  "pm.environment.set('csrfToken', body.csrfToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign in with Credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+              { "key": "X-Auth-Return-Redirect", "value": "1" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "csrfToken", "value": "{{csrfToken}}", "type": "text" },
+                { "key": "callbackUrl", "value": "{{callbackUrl}}", "type": "text" },
+                { "key": "email", "value": "{{email}}", "type": "text" },
+                { "key": "password", "value": "{{password}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/callback/credentials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "callback", "credentials"]
+            },
+            "description": "Populate email and password as local-only Postman environment secrets. Run Get CSRF token first. Postman retains the returned Auth.js cookies in its cookie jar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Credentials callback returns JSON redirect data', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().url).to.be.a('string'); });",
+                  "pm.test('Credentials were accepted', function () { pm.expect(pm.response.json().url).not.to.include('error='); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get current session",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "session"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Session endpoint returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Session exposes public user fields only', function () { const body = pm.response.json(); pm.expect(body.user).to.be.an('object'); pm.expect(body.user).to.have.property('id'); pm.expect(body.user).to.have.property('email'); pm.expect(body.user).not.to.have.property('passwordHash'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign out",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+              { "key": "X-Auth-Return-Redirect", "value": "1" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "csrfToken", "value": "{{csrfToken}}", "type": "text" },
+                { "key": "callbackUrl", "value": "{{callbackUrl}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "signout"]
+            },
+            "description": "Run Get CSRF token immediately before this request. Cookies stay in Postman's cookie jar and are not copied into variables."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sign-out returns redirect data', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().url).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B - Tasks",
+      "description": "Use a dedicated test account. Create and delete only a disposable classroom task.",
+      "item": [
+        {
+          "name": "GET - List my tasks",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Task list returns 200 and an array', function () { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Search, filter, and paginate tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/tasks",
+            "description": "Uses the Auth.js cookie session. Set any optional environment filters: search, status, priority, assignee, dueAfter, dueBefore. Pagination returns tasks, page, limit, total, and totalPages."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.url.query.clear();",
+                  "['search', 'status', 'priority', 'assignee', 'dueAfter', 'dueBefore', 'page', 'limit'].forEach(function (key) { const value = pm.environment.get(key); if (value !== undefined && value !== null && String(value).trim() !== '') pm.request.url.query.add({ key: key, value: String(value) }); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Filtered task list returns a paginated envelope', function () { pm.response.to.have.status(200); const body = pm.response.json(); pm.expect(body.tasks).to.be.an('array'); pm.expect(body).to.have.property('page'); pm.expect(body).to.have.property('limit'); pm.expect(body).to.have.property('total'); pm.expect(body).to.have.property('totalPages'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST - Create disposable task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              {
+                "key": "Origin",
+                "value": "{{apiOrigin}}",
+                "description": "For this explicit Postman client request, set the actual API origin. Do not rewrite browser Origin headers."
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Learn REST API with Postman\",\n  \"description\": \"Disposable TaskFlow classroom test record\",\n  \"status\": \"Pending\",\n  \"priority\": \"High\",\n  \"assignee\": \"Classroom Student\",\n  \"category\": \"Training\",\n  \"dueDate\": \"2026-11-18\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Creates a real database record in database mode. Use only a dedicated classroom account."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Task creation returns 201', function () { pm.response.to.have.status(201); });",
+                  "const task = pm.response.json();",
+                  "pm.expect(task).to.have.property('id');",
+                  "pm.expect(task.title).to.eql('Learn REST API with Postman');",
+                  "pm.environment.set('taskId', task.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Retrieve task by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "{{taskId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Task lookup returns the created record', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().id).to.eql(pm.environment.get('taskId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH - Update disposable task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{apiOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated through Postman\",\n  \"status\": \"In Progress\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "{{taskId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Task update returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.expect(pm.response.json().title).to.eql('Updated through Postman');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE - Delete disposable task (DESTRUCTIVE)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Origin", "value": "{{apiOrigin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "{{taskId}}"]
+            },
+            "description": "Permanently deletes taskId. Run only after creating a disposable task for this test."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Task delete returns 204 with no body', function () { pm.response.to.have.status(204); pm.expect(pm.response.text()).to.eql(''); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "C - Security tests",
+      "description": "Use two dedicated test users. Sign out before the unauthenticated request. Account B must not access Account A's disposable task.",
+      "item": [
+        {
+          "name": "Auth.js - Invalid credentials are rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+              { "key": "X-Auth-Return-Redirect", "value": "1" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "csrfToken", "value": "{{csrfToken}}", "type": "text" },
+                { "key": "callbackUrl", "value": "{{callbackUrl}}", "type": "text" },
+                { "key": "email", "value": "invalid@example.invalid", "type": "text" },
+                { "key": "password", "value": "not-a-valid-classroom-password", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/callback/credentials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "callback", "credentials"]
+            },
+            "description": "Run only against local/preview or with instructor approval. This consumes one login rate-limit attempt and must return a generic CredentialsSignin error."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid credentials are rejected without account details', function () { pm.expect(pm.response.json().url).to.include('error='); pm.expect(pm.response.json().url).not.to.include('invalid@example.invalid'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auth.js - Missing CSRF token is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+              { "key": "X-Auth-Return-Redirect", "value": "1" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "callbackUrl", "value": "{{callbackUrl}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/callback/credentials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "callback", "credentials"]
+            },
+            "description": "No credentials or task mutation is attempted. Auth.js must reject the missing CSRF token before credential authorization."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing CSRF is rejected by Auth.js', function () { pm.expect(pm.response.json().url).to.include('error='); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auth.js - Invalid CSRF token is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+              { "key": "X-Auth-Return-Redirect", "value": "1" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "csrfToken", "value": "invalid-classroom-token", "type": "text" },
+                { "key": "callbackUrl", "value": "{{callbackUrl}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/callback/credentials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "callback", "credentials"]
+            },
+            "description": "The provided token cannot match Auth.js's CSRF cookie; no credentials or task mutation is attempted."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid CSRF is rejected by Auth.js', function () { pm.expect(pm.response.json().url).to.include('error='); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Tasks without a session (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Sign out first, then run this request. Expected response: 401."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unauthenticated request returns 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Malformed task ID (400)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/not-a-uuid",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "not-a-uuid"]
+            },
+            "description": "Run while authenticated. The handler authenticates before validating this ID."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Malformed UUID returns 400', function () { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('INVALID_ID'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Nonexistent task ID (404)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/00000000-0000-4000-8000-000000000001",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "00000000-0000-4000-8000-000000000001"]
+            },
+            "description": "Run while authenticated. The fixed UUID is reserved for this nonexistent-record check."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Nonexistent task UUID returns 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account B - Get CSRF token",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/csrf",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "csrf"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Account B CSRF token is ready', function () { pm.response.to.have.status(200); pm.environment.set('csrfToken', pm.response.json().csrfToken); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account B - Sign in",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+              { "key": "X-Auth-Return-Redirect", "value": "1" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "csrfToken", "value": "{{csrfToken}}", "type": "text" },
+                { "key": "callbackUrl", "value": "{{callbackUrl}}", "type": "text" },
+                { "key": "email", "value": "{{accountBEmail}}", "type": "text" },
+                { "key": "password", "value": "{{accountBPassword}}", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/callback/credentials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "callback", "credentials"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Account B credentials were accepted', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().url).not.to.include('error='); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account B - GET Account A task (404)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "{{taskId}}"]
+            },
+            "description": "Sign in as Account B after creating taskId while signed in as Account A."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Another user task is hidden as 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account B - PATCH Account A task (404)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{apiOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Must not be changed by Account B\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "{{taskId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Another user task cannot be updated', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account B - DELETE Account A task (404, DESTRUCTIVE TEST)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Origin", "value": "{{apiOrigin}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "{{taskId}}"]
+            },
+            "description": "Only use a disposable task owned by Account A. Expected 404; if authorization regresses, this could delete it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Another user cannot delete the task', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST - Invalid task body (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "{{apiOrigin}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\",\n  \"ownerId\": \"not-accepted\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid or mass-assigned fields return 400', function () { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH - Untrusted Origin rejected (403)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Origin", "value": "https://untrusted.example" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks", "{{taskId}}"]
+            },
+            "description": "The empty patch would fail validation if origin validation were skipped, so it cannot change task data."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Untrusted Origin is rejected before payload validation', function () { pm.response.to.have.status(403); pm.expect(pm.response.json().error.code).to.eql('INVALID_ORIGIN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST - Missing Origin rejected (403)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Must not be created without Origin\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tasks"]
+            },
+            "description": "Expected 403; the Origin header is deliberately omitted."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing Origin is rejected', function () { pm.response.to.have.status(403); pm.expect(pm.response.json().error.code).to.eql('INVALID_ORIGIN'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "D - Bearer API",
+      "description": "Use tokens created in TaskFlow Settings. Set accessToken to a secret token with profile:read, tasks:read, and tasks:write; set readOnlyAccessToken to a separate tasks:read token. Ownership checks also require Account B's token and a task created by Account B. Defaults target the local backend.",
+      "item": [
+        {
+          "name": "GET - Current token owner",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Profile endpoint returns safe owner fields', function () { pm.response.to.have.status(200); const body = pm.response.json(); pm.expect(body).to.have.property('id'); pm.expect(body).to.have.property('email'); pm.expect(body).not.to.have.property('passwordHash'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Search, filter, and paginate Bearer tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tasks?page={{page}}&limit={{limit}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "tasks"],
+              "query": [
+                { "key": "page", "value": "{{page}}" },
+                { "key": "limit", "value": "{{limit}}" }
+              ]
+            },
+            "description": "Optional filters are read from the environment: search, status, priority, assignee, dueAfter, and dueBefore."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.url.query.clear();",
+                  "['search', 'status', 'priority', 'assignee', 'dueAfter', 'dueBefore', 'page', 'limit'].forEach(function (key) { const value = pm.environment.get(key); if (value !== undefined && value !== null && String(value).trim() !== '') pm.request.url.query.add({ key: key, value: String(value) }); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bearer task list returns the paginated envelope', function () { pm.response.to.have.status(200); const body = pm.response.json(); pm.expect(body.tasks).to.be.an('array'); ['page', 'limit', 'total', 'totalPages'].forEach(function (key) { pm.expect(body).to.have.property(key); }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST - Create Bearer task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Bearer task\",\n  \"description\": \"Disposable task created by the local Postman collection\",\n  \"assignee\": \"Classroom Student\",\n  \"category\": \"Training\",\n  \"priority\": \"High\",\n  \"status\": \"Pending\",\n  \"dueDate\": \"\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bearer task creation returns 201', function () { pm.response.to.have.status(201); });",
+                  "const task = pm.response.json();",
+                  "pm.expect(task).to.have.property('id');",
+                  "pm.environment.set('bearerTaskId', task.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Retrieve Bearer task",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{bearerTaskId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bearer task lookup returns the created record', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().id).to.eql(pm.environment.get('bearerTaskId')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH - Update Bearer task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Postman Bearer task\",\n  \"description\": \"Updated through the versioned Bearer API\",\n  \"status\": \"Completed\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks/{{bearerTaskId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bearer task update returns 200', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().title).to.eql('Updated Postman Bearer task'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST - Write request with read-only token (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{readOnlyAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Must not be created without tasks:write\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing write scope returns 403', function () { pm.response.to.have.status(403); pm.expect(pm.response.json().error.code).to.eql('INSUFFICIENT_SCOPE'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST - Invalid Bearer task payload (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\",\n  \"ownerId\": \"not-accepted\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid or mass-assigned payload returns 400', function () { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Missing Bearer token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing token returns 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Invalid Bearer token (401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer invalid-example-token" }
+            ],
+            "url": "{{baseUrl}}/api/v1/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid token returns 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OPTIONS - Bearer API preflight",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              { "key": "Origin", "value": "https://classroom.example" },
+              { "key": "Access-Control-Request-Method", "value": "POST" },
+              { "key": "Access-Control-Request-Headers", "value": "authorization,content-type" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bearer preflight allows Authorization without cookies', function () { pm.response.to.have.status(204); pm.expect(pm.response.headers.get('Access-Control-Allow-Origin')).to.eql('*'); pm.expect(pm.response.headers.get('Access-Control-Allow-Headers')).to.include('Authorization'); pm.expect(pm.response.headers.get('Access-Control-Allow-Credentials')).to.be.null; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST - Account B creates a disposable Bearer task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accountBAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Account B foreign Bearer task\",\n  \"description\": \"Disposable task for owner isolation verification\",\n  \"category\": \"Security testing\",\n  \"priority\": \"Low\",\n  \"status\": \"Pending\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks",
+            "description": "Use Account B's separate tasks:write token. The response stores this task ID for Account A's ownership checks."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Account B task creation returns 201', function () { pm.response.to.have.status(201); });",
+                  "pm.environment.set('foreignBearerTaskId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET - Account A cannot read Account B task (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{foreignBearerTaskId}}",
+            "description": "Requires foreignBearerTaskId to belong to Account B and accessToken to belong to Account A."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Foreign task is hidden as 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH - Account A cannot update Account B task (404)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Must remain unchanged\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks/{{foreignBearerTaskId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Foreign task cannot be updated', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE - Account A cannot delete Account B task (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{foreignBearerTaskId}}",
+            "description": "Expected 404. Run only with a disposable task owned by Account B."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Foreign task cannot be deleted', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE - Delete disposable Bearer task",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{bearerTaskId}}",
+            "description": "Destructive: deletes only the task created by the POST - Create Bearer task request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bearer task delete returns 204', function () { pm.response.to.have.status(204); pm.expect(pm.response.text()).to.eql(''); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE - Account B removes its disposable foreign task",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accountBAccessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{foreignBearerTaskId}}",
+            "description": "Cleanup request. Run only for foreignBearerTaskId created by Account B for this test."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Account B cleanup returns 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

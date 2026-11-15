@@ -19,6 +19,12 @@ enum TaskStatus {
   COMPLETED
 }
 
+enum PersonalAccessTokenScope {
+  TASKS_READ  @map("tasks:read")
+  TASKS_WRITE @map("tasks:write")
+  PROFILE_READ @map("profile:read")
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   name         String
@@ -27,7 +33,8 @@ model User {
   sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  tasks        Task[]
+  tasks                 Task[]
+  personalAccessTokens PersonalAccessToken[]
 }
 
 model Task {
@@ -46,6 +53,23 @@ model Task {
 
   @@index([ownerId])
   @@index([status, dueDate])
+}
+
+model PersonalAccessToken {
+  id         String                      @id @default(uuid()) @db.Uuid
+  userId     String                      @db.Uuid
+  name       String                      @db.VarChar(100)
+  tokenHash  String                      @unique @db.Char(64)
+  tokenPrefix String                     @db.VarChar(24)
+  scopes     PersonalAccessTokenScope[]
+  createdAt  DateTime                    @default(now())
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  user       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
 model AuthRateLimit {
