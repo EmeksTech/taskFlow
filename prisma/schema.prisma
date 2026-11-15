@@ -24,6 +24,7 @@ model User {
   name         String
   email        String   @unique @db.VarChar(320)
   passwordHash String?
+  sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   tasks        Task[]
@@ -45,4 +46,12 @@ model Task {
 
   @@index([ownerId])
   @@index([status, dueDate])
+}
+
+model AuthRateLimit {
+  key             String   @id @db.VarChar(64)
+  attempts        Int      @default(0)
+  windowStartedAt DateTime @db.Timestamptz(3)
+
+  @@index([windowStartedAt])
 }

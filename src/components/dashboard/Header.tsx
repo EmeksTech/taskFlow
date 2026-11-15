@@ -1,4 +1,24 @@
-export function Header() {
+import Link from "next/link";
+import { logoutAction } from "@/app/actions/auth";
+
+function getInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toLocaleUpperCase() ?? "")
+    .join("") || "U";
+}
+
+export async function Header() {
+  const databaseMode = process.env.NEXT_PUBLIC_API_MODE === "database";
+  const session = databaseMode
+    ? await (await import("@/auth")).auth()
+    : null;
+  const name = databaseMode
+    ? session?.user?.name?.trim() || "Account"
+    : "Alex Kim";
+
   const today = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
@@ -17,7 +37,7 @@ export function Header() {
 
         <div className="flex items-center gap-3 sm:gap-5">
           <span className="hidden text-sm text-slate-500 sm:inline">
-            Good morning, Alex
+            Good morning, {name.split(/\s+/)[0]}
           </span>
           <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-600">
             <svg
@@ -36,9 +56,48 @@ export function Header() {
             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-rose-500" />
             <span className="sr-only">Notifications</span>
           </span>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800">
-            AK
-          </div>
+          {databaseMode && session?.user ? (
+            <details className="group relative">
+              <summary
+                aria-label="Open account menu"
+                className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800 marker:hidden"
+              >
+                {getInitials(name)}
+              </summary>
+              <div className="absolute right-0 top-12 z-50 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                <p className="truncate px-3 py-2 text-sm font-semibold text-slate-800">
+                  {name}
+                </p>
+                <Link
+                  href="/profile"
+                  className="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  Profile
+                </Link>
+                <Link
+                  href="/settings"
+                  className="block rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  Settings
+                </Link>
+                <form action={logoutAction}>
+                  <button
+                    type="submit"
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50"
+                  >
+                    Log out
+                  </button>
+                </form>
+              </div>
+            </details>
+          ) : (
+            <div
+              aria-label={databaseMode ? "Account" : "Alex Kim"}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-800"
+            >
+              {databaseMode ? getInitials(name) : "AK"}
+            </div>
+          )}
         </div>
       </div>
     </header>

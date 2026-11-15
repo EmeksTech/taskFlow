@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import {
   databaseApiDisabled,
+  sameOriginFailure,
   jsonError,
   logDatabaseFailure,
   readJsonBody,
@@ -12,10 +13,14 @@ import {
   toDatabasePriority,
   toDatabaseStatus,
 } from "@/lib/tasks/database";
+import { requireApiUser } from "@/lib/auth/server";
+import { ownedTaskWhere } from "@/lib/tasks/authorization";
 import {
   createTaskSchema,
   taskQuerySchema,
 } from "@/lib/tasks/validation";
+
+export const runtime = "nodejs";
 
 function getTaskQuery(searchParams: URLSearchParams) {
   return taskQuerySchema.safeParse({
@@ -34,11 +39,15 @@ export async function GET(request: Request) {
   const disabled = databaseApiDisabled();
   if (disabled) return disabled;
 
+  const authenticated = await requireApiUser("GET /api/tasks");
+  if ("response" in authenticated) return authenticated.response;
+  const { userId } = authenticated;
+
   const parsedQuery = getTaskQuery(new URL(request.url).searchParams);
   if (!parsedQuery.success) return validationError(parsedQuery.error);
 
   const { data: query } = parsedQuery;
-  const where: Prisma.TaskWhereInput = {};
+  const where: Prisma.TaskWhereInput = ownedTaskWhere(userId);
 
   if (query.status) {
     where.status = toDatabaseStatus(query.status);
@@ -80,6 +89,13 @@ export async function POST(request: Request) {
   const disabled = databaseApiDisabled();
   if (disabled) return disabled;
 
+  const authenticated = await requireApiUser("POST /api/tasks");
+  if ("response" in authenticated) return authenticated.response;
+  const { userId } = authenticated;
+
+  const originError = sameOriginFailure(request);
+  if (originError) return originError;
+
   const parsedBody = await readJsonBody(request);
   if ("response" in parsedBody) return parsedBody.response;
 
@@ -89,7 +105,10 @@ export async function POST(request: Request) {
   try {
     const { prisma } = await import("@/lib/prisma");
     const task = await prisma.task.create({
-      data: toCreateTaskData(parsedTask.data),
+      data: {
+        ...toCreateTaskData(parsedTask.data),
+        owner: { connect: { id: userId } },
+      },
     });
     return Response.json(toApiTask(task), { status: 201 });
   } catch (error) {

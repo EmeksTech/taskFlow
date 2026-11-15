@@ -1,7 +1,15 @@
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { requirePageUser } from "@/lib/auth/page";
+import { isDatabaseMode } from "@/lib/auth/server";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+export default async function Home() {
+  if (isDatabaseMode()) {
+    const user = await requirePageUser();
+    if (!user) redirect("/login");
+  }
+
   return (
     <DashboardShell activePage="overview">
       <div id="overview" className="mb-7 scroll-mt-24">

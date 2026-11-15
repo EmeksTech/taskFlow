@@ -31,15 +31,30 @@ export function validationError(error: z.ZodError) {
 }
 
 export function databaseApiDisabled() {
-  if (
-    process.env.NODE_ENV !== "development" ||
-    process.env.NEXT_PUBLIC_API_MODE !== "database"
-  ) {
+  if (process.env.NEXT_PUBLIC_API_MODE !== "database") {
     return jsonError(
       404,
       "NOT_FOUND",
-      "The database API is available only in development database mode.",
+      "The database API is unavailable while mock mode is enabled.",
     );
+  }
+
+  return null;
+}
+
+export function sameOriginFailure(request: Request) {
+  const origin = request.headers.get("origin");
+
+  if (!origin) {
+    return jsonError(403, "INVALID_ORIGIN", "A same-origin request is required.");
+  }
+
+  try {
+    if (new URL(origin).origin !== new URL(request.url).origin) {
+      return jsonError(403, "INVALID_ORIGIN", "A same-origin request is required.");
+    }
+  } catch {
+    return jsonError(403, "INVALID_ORIGIN", "A same-origin request is required.");
   }
 
   return null;
