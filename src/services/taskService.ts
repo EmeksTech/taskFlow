@@ -3,7 +3,16 @@ import type { Task, TaskInput } from "@/types/task";
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001"
 ).replace(/\/+$/, "");
-const TASKS_URL = `${API_BASE_URL}/tasks`;
+const API_MODE = process.env.NEXT_PUBLIC_API_MODE ?? "mock";
+
+if (API_MODE !== "mock" && API_MODE !== "database") {
+  throw new Error(
+    'NEXT_PUBLIC_API_MODE must be either "mock" or "database".',
+  );
+}
+
+const TASKS_URL =
+  API_MODE === "database" ? "/api/tasks" : `${API_BASE_URL}/tasks`;
 
 async function ensureOk(response: Response) {
   if (!response.ok) {
