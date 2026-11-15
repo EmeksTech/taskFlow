@@ -1,0 +1,511 @@
+{
+  "info": {
+    "_postman_id": "bc8fb8b6-44d3-4f4b-93db-901f5f923413",
+    "name": "TaskFlow Versioned REST API",
+    "description": "Bearer-token API exercises. Defaults to the local database-mode TaskFlow server at localhost:3100. Use only disposable accounts and tasks; no production URL or token is included.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3100" },
+    { "key": "accessToken", "value": "" },
+    { "key": "readOnlyAccessToken", "value": "" },
+    { "key": "expiredToken", "value": "" },
+    { "key": "revokedToken", "value": "" },
+    { "key": "taskId", "value": "" },
+    { "key": "foreignTaskId", "value": "" },
+    { "key": "accountBAccessToken", "value": "" },
+    { "key": "search", "value": "" },
+    { "key": "status", "value": "" },
+    { "key": "priority", "value": "" },
+    { "key": "assignee", "value": "" },
+    { "key": "dueAfter", "value": "" },
+    { "key": "dueBefore", "value": "" },
+    { "key": "page", "value": "1" },
+    { "key": "limit", "value": "10" }
+  ],
+  "item": [
+    {
+      "name": "A - Authentication and scope checks",
+      "item": [
+        {
+          "name": "Get current user (profile:read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/me",
+            "description": "Requires a token with profile:read."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Current user returns 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Safe user fields are returned', function () { pm.expect(body).to.have.property('id'); pm.expect(body).to.have.property('name'); pm.expect(body).to.have.property('email'); pm.expect(body).not.to.have.property('passwordHash'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject missing bearer token",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/tasks",
+            "description": "No Authorization header is sent."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing token returns 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Error envelope is consistent', function () { pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid bearer token",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer invalid-token" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid token returns 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject expired token fixture",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{expiredToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks",
+            "description": "Requires an instructor-provided, already-expired disposable token fixture."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expired-token fixture is configured', function () { pm.expect(pm.environment.get('expiredToken')).to.be.a('string').and.not.empty; });",
+                  "pm.test('Expired token returns 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject revoked token fixture",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{revokedToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks",
+            "description": "Requires a disposable token that was revoked in TaskFlow."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Revoked-token fixture is configured', function () { pm.expect(pm.environment.get('revokedToken')).to.be.a('string').and.not.empty; });",
+                  "pm.test('Revoked token returns 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject write with read-only scope",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{readOnlyAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"This request must not create a task\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks",
+            "description": "Use a token with tasks:read only. Scope validation occurs before task creation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Read-only token fixture is configured', function () { pm.expect(pm.environment.get('readOnlyAccessToken')).to.be.a('string').and.not.empty; });",
+                  "pm.test('Read-only token cannot write', function () { pm.response.to.have.status(403); });",
+                  "pm.test('Insufficient scope is reported', function () { pm.expect(pm.response.json().error.code).to.eql('INSUFFICIENT_SCOPE'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B - Task CRUD (use disposable tasks)",
+      "item": [
+        {
+          "name": "List my tasks with search, filters, and pagination",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks?page={{page}}&limit={{limit}}",
+            "description": "Optional environment filters: search, status, priority, assignee, dueAfter, and dueBefore."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.url.query.clear();",
+                  "['search', 'status', 'priority', 'assignee', 'dueAfter', 'dueBefore', 'page', 'limit'].forEach(function (key) { const value = pm.environment.get(key); if (value !== undefined && value !== null && String(value).trim() !== '') pm.request.url.query.add({ key: key, value: String(value) }); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('List returns a paginated task envelope', function () { pm.response.to.have.status(200); const body = pm.response.json(); pm.expect(body.tasks).to.be.an('array'); ['page', 'limit', 'total', 'totalPages'].forEach(function (key) { pm.expect(body).to.have.property(key); }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get task by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{taskId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Owned task returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Task has expected public contract', function () { const body = pm.response.json(); pm.expect(body).to.have.property('id'); pm.expect(body).to.have.property('title'); pm.expect(body).not.to.have.property('ownerId'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create disposable task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman disposable task\",\n  \"description\": \"Delete this task after the classroom exercise\",\n  \"assignee\": \"Classroom Student\",\n  \"category\": \"Classroom\",\n  \"priority\": \"Medium\",\n  \"status\": \"Pending\",\n  \"dueDate\": \"2026-11-18\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks",
+            "description": "Creates a real task in the selected database. Use a disposable test account. The test stores its ID in taskId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Create returns 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Created task has an ID and no ownerId', function () { pm.expect(body.id).to.be.a('string').and.not.empty; pm.expect(body).not.to.have.property('ownerId'); });",
+                  "pm.environment.set('taskId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject client-supplied ownerId",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Invalid owner assignment\",\n  \"ownerId\": \"00000000-0000-4000-8000-000000000001\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Owner mass assignment is rejected', function () { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update disposable task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman disposable task - updated\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks/{{taskId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Update returns 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Title is updated', function () { pm.expect(pm.response.json().title).to.eql('Postman disposable task - updated'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete disposable task (DESTRUCTIVE)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{taskId}}",
+            "description": "DESTRUCTIVE: deletes taskId. Run only after Create disposable task with a disposable account."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Delete returns 204', function () { pm.response.to.have.status(204); });",
+                  "pm.environment.unset('taskId');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "C - Ownership and CORS",
+      "item": [
+        {
+          "name": "Create disposable foreign task as Account B",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accountBAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Account B disposable ownership task\",\n  \"description\": \"Use only for owner-isolation verification\",\n  \"category\": \"Security testing\",\n  \"priority\": \"Low\",\n  \"status\": \"Pending\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks",
+            "description": "Set accountBAccessToken to a separate Account B token with tasks:write. Stores the new task ID as foreignTaskId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Account B task creation returns 201', function () { pm.response.to.have.status(201); });",
+                  "pm.environment.set('foreignTaskId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hide another user's task",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{foreignTaskId}}",
+            "description": "Set foreignTaskId to a disposable task UUID owned by a different test account."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Foreign task fixture is configured', function () { pm.expect(pm.environment.get('foreignTaskId')).to.be.a('string').and.not.empty; });",
+                  "pm.test('Foreign task is hidden as 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('No foreign task data is returned', function () { pm.expect(pm.response.json().error.code).to.eql('NOT_FOUND'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cannot update another user's task (404)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Must remain unchanged by Account A\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/tasks/{{foreignTaskId}}",
+            "description": "Run with Account A's accessToken and a disposable foreignTaskId owned by Account B."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Foreign task update returns 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cannot delete another user's task (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{foreignTaskId}}",
+            "description": "Run only with the disposable Account B task created above; expected 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Foreign task delete returns 404', function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cleanup Account B disposable task",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accountBAccessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks/{{foreignTaskId}}",
+            "description": "Destructive: run after all Account A ownership checks to delete only the Account B task created above."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Account B cleanup returns 204', function () { pm.response.to.have.status(204); });",
+                  "pm.environment.unset('foreignTaskId');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CORS preflight for browser clients",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              { "key": "Origin", "value": "http://localhost:5174" },
+              { "key": "Access-Control-Request-Method", "value": "POST" },
+              { "key": "Access-Control-Request-Headers", "value": "authorization,content-type" }
+            ],
+            "url": "{{baseUrl}}/api/v1/tasks"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Preflight returns 204', function () { pm.response.to.have.status(204); });",
+                  "pm.test('Wildcard origin and Authorization header are allowed', function () { pm.expect(pm.response.headers.get('Access-Control-Allow-Origin')).to.eql('*'); pm.expect(pm.response.headers.get('Access-Control-Allow-Headers')).to.include('Authorization'); });",
+                  "pm.test('Credentialed CORS is not enabled', function () { pm.expect(pm.response.headers.has('Access-Control-Allow-Credentials')).to.eql(false); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

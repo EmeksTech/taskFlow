@@ -3,6 +3,7 @@ import { PasswordForm } from "@/components/auth/PasswordForm";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { requirePageUser } from "@/lib/auth/page";
 import { isDatabaseMode } from "@/lib/auth/server";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function SettingsPage() {
@@ -31,6 +32,18 @@ export default async function SettingsPage() {
           to sign in again after changing it.
         </p>
         <PasswordForm />
+      </section>
+      <section className="mt-6 max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+        <h2 className="text-lg font-semibold text-slate-900">API access</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-500">
+          Create and revoke scoped personal access tokens for trusted clients.
+        </p>
+        <Link
+          href="/settings/api-tokens"
+          className="mt-4 inline-flex rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Manage API tokens
+        </Link>
       </section>
     </DashboardShell>
   );

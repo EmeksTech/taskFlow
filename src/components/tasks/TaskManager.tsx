@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { TaskForm } from "@/components/tasks/TaskForm";
 import { useTasks } from "@/hooks/useTasks";
 import {
@@ -11,7 +11,13 @@ import {
   isTaskOverdue,
 } from "@/lib/taskPresentation";
 import { createTask, deleteTask, updateTask } from "@/services/taskService";
-import type { Task, TaskInput, TaskPriority, TaskStatus } from "@/types/task";
+import type {
+  Task,
+  TaskInput,
+  TaskListQuery,
+  TaskPriority,
+  TaskStatus,
+} from "@/types/task";
 
 const priorityColors: Record<TaskPriority, string> = {
   High: "bg-rose-50 text-rose-700",
@@ -25,6 +31,24 @@ const statusColors: Record<TaskStatus, string> = {
   Completed: "bg-emerald-50 text-emerald-700",
 };
 
+interface TaskFilterDraft {
+  search: string;
+  status: TaskStatus | "";
+  priority: TaskPriority | "";
+  assignee: string;
+  dueAfter: string;
+  dueBefore: string;
+}
+
+const emptyFilters: TaskFilterDraft = {
+  search: "",
+  status: "",
+  priority: "",
+  assignee: "",
+  dueAfter: "",
+  dueBefore: "",
+};
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
@@ -32,7 +56,14 @@ function getErrorMessage(error: unknown) {
 }
 
 export function TaskManager() {
-  const { tasks, setTasks, isLoading, error, reload } = useTasks();
+  const [query, setQuery] = useState<TaskListQuery>({
+    page: 1,
+    limit: 10,
+    sortBy: "createdAt",
+    order: "desc",
+  });
+  const [filters, setFilters] = useState(emptyFilters);
+  const { tasks, pageInfo, isLoading, error, reload } = useTasks(query);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
@@ -40,6 +71,33 @@ export function TaskManager() {
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextQuery: TaskListQuery = {
+      page: 1,
+      limit: query.limit ?? 10,
+      sortBy: "createdAt",
+      order: "desc",
+    };
+    if (filters.search.trim()) nextQuery.search = filters.search.trim();
+    if (filters.status) nextQuery.status = filters.status;
+    if (filters.priority) nextQuery.priority = filters.priority;
+    if (filters.assignee.trim()) nextQuery.assignee = filters.assignee.trim();
+    if (filters.dueAfter) nextQuery.dueAfter = filters.dueAfter;
+    if (filters.dueBefore) nextQuery.dueBefore = filters.dueBefore;
+    setQuery(nextQuery);
+  }
+
+  function clearFilters() {
+    setFilters(emptyFilters);
+    setQuery({
+      page: 1,
+      limit: query.limit ?? 10,
+      sortBy: "createdAt",
+      order: "desc",
+    });
+  }
 
   function openCreateForm() {
     setEditingTask(undefined);
@@ -59,15 +117,15 @@ export function TaskManager() {
 
     try {
       if (editingTask) {
-        const updatedTask = await updateTask(editingTask.id, values);
-        setTasks((current) =>
-          current.map((task) =>
-            task.id === updatedTask.id ? updatedTask : task,
-          ),
-        );
+        await updateTask(editingTask.id, values);
+        await reload();
       } else {
-        const createdTask = await createTask(values);
-        setTasks((current) => [createdTask, ...current]);
+        await createTask(values);
+        if (query.page !== 1) {
+          setQuery((current) => ({ ...current, page: 1 }));
+        } else {
+          await reload();
+        }
       }
 
       setIsFormOpen(false);
@@ -84,10 +142,8 @@ export function TaskManager() {
     setIsMutating(true);
 
     try {
-      const updatedTask = await updateTask(task.id, { status: "Completed" });
-      setTasks((current) =>
-        current.map((item) => (item.id === updatedTask.id ? updatedTask : item)),
-      );
+      await updateTask(task.id, { status: "Completed" });
+      await reload();
     } catch (updateError) {
       setActionError(getErrorMessage(updateError));
     } finally {
@@ -103,10 +159,15 @@ export function TaskManager() {
 
     try {
       await deleteTask(taskToDelete.id);
-      setTasks((current) =>
-        current.filter((task) => task.id !== taskToDelete.id),
-      );
       setTaskToDelete(null);
+      if (query.page && query.page > 1 && tasks.length === 1) {
+        setQuery((current) => ({
+          ...current,
+          page: Math.max(1, (current.page ?? 1) - 1),
+        }));
+      } else {
+        await reload();
+      }
     } catch (deleteError) {
       setDeleteError(getErrorMessage(deleteError));
     } finally {
@@ -136,6 +197,112 @@ export function TaskManager() {
           Add Task
         </button>
       </div>
+
+      <form
+        onSubmit={applyFilters}
+        className="mb-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <label className="block sm:col-span-2">
+          <span className="mb-1 block text-xs font-medium text-slate-600">
+            Search title and description
+          </span>
+          <input
+            type="search"
+            value={filters.search}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, search: event.target.value }))
+            }
+            maxLength={200}
+            placeholder="Search tasks"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Status</span>
+          <select
+            value={filters.status}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                status: event.target.value as TaskFilterDraft["status"],
+              }))
+            }
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          >
+            <option value="">All statuses</option>
+            <option>Pending</option>
+            <option>In Progress</option>
+            <option>Completed</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Priority</span>
+          <select
+            value={filters.priority}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                priority: event.target.value as TaskFilterDraft["priority"],
+              }))
+            }
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          >
+            <option value="">All priorities</option>
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Assignee</span>
+          <input
+            value={filters.assignee}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, assignee: event.target.value }))
+            }
+            maxLength={120}
+            placeholder="Filter by assignee"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Due on or after</span>
+          <input
+            type="date"
+            value={filters.dueAfter}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, dueAfter: event.target.value }))
+            }
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Due on or before</span>
+          <input
+            type="date"
+            value={filters.dueBefore}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, dueBefore: event.target.value }))
+            }
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+          <button
+            type="submit"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            Apply filters
+          </button>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Clear
+          </button>
+        </div>
+      </form>
 
       {actionError && (
         <p
@@ -171,9 +338,13 @@ export function TaskManager() {
         </div>
       ) : tasks.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-          <h2 className="font-semibold text-slate-800">No tasks yet</h2>
+          <h2 className="font-semibold text-slate-800">
+            {pageInfo?.total ? "No tasks on this page" : "No matching tasks"}
+          </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Create your first task to get the team moving.
+            {pageInfo?.total
+              ? "Try another page or update your filters."
+              : "Adjust your filters or add a task to get started."}
           </p>
           <button
             type="button"
@@ -191,7 +362,8 @@ export function TaskManager() {
                 All tasks
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                {tasks.length} {tasks.length === 1 ? "task" : "tasks"} in your
+                {pageInfo?.total ?? tasks.length}{" "}
+                {(pageInfo?.total ?? tasks.length) === 1 ? "task" : "tasks"} in your
                 workspace
               </p>
             </div>
@@ -301,6 +473,35 @@ export function TaskManager() {
               </li>
             ))}
           </ul>
+          {pageInfo && pageInfo.totalPages > 0 && (
+            <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <p className="text-slate-500">
+                Page {pageInfo.page} of {pageInfo.totalPages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={pageInfo.page <= 1 || isLoading}
+                  onClick={() =>
+                    setQuery((current) => ({ ...current, page: pageInfo.page - 1 }))
+                  }
+                  className="rounded-lg border border-slate-200 px-3 py-2 font-medium text-slate-700 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  disabled={pageInfo.page >= pageInfo.totalPages || isLoading}
+                  onClick={() =>
+                    setQuery((current) => ({ ...current, page: pageInfo.page + 1 }))
+                  }
+                  className="rounded-lg border border-slate-200 px-3 py-2 font-medium text-slate-700 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 

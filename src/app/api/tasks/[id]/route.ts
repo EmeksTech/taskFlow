@@ -7,10 +7,13 @@ import {
   sameOriginFailure,
   validationError,
 } from "@/lib/tasks/http";
-import { toApiTask, toUpdateTaskData } from "@/lib/tasks/database";
 import { updateTaskSchema } from "@/lib/tasks/validation";
 import { requireApiUser } from "@/lib/auth/server";
-import { ownedTaskWhere } from "@/lib/tasks/authorization";
+import {
+  deleteOwnedTask,
+  getOwnedTask,
+  updateOwnedTask,
+} from "@/lib/tasks/service";
 
 export const runtime = "nodejs";
 
@@ -30,12 +33,9 @@ export async function GET(_request: Request, { params }: TaskRouteContext) {
   if (!isUuid(id)) return jsonError(400, "INVALID_ID", "Task ID must be a UUID.");
 
   try {
-    const { prisma } = await import("@/lib/prisma");
-    const task = await prisma.task.findFirst({
-      where: ownedTaskWhere(userId, id),
-    });
+    const task = await getOwnedTask(userId, id);
     if (!task) return jsonError(404, "NOT_FOUND", "Task was not found.");
-    return Response.json(toApiTask(task));
+    return Response.json(task);
   } catch (error) {
     logDatabaseFailure("GET /api/tasks/[id]", error);
     return jsonError(500, "DATABASE_ERROR", "Unable to retrieve the task.");
@@ -63,20 +63,9 @@ export async function PATCH(request: Request, { params }: TaskRouteContext) {
   if (!parsedTask.success) return validationError(parsedTask.error);
 
   try {
-    const { prisma } = await import("@/lib/prisma");
-    const result = await prisma.task.updateMany({
-      where: ownedTaskWhere(userId, id),
-      data: toUpdateTaskData(parsedTask.data),
-    });
-    if (result.count === 0) {
-      return jsonError(404, "NOT_FOUND", "Task was not found.");
-    }
-
-    const task = await prisma.task.findFirst({
-      where: ownedTaskWhere(userId, id),
-    });
+    const task = await updateOwnedTask(userId, id, parsedTask.data);
     if (!task) return jsonError(404, "NOT_FOUND", "Task was not found.");
-    return Response.json(toApiTask(task));
+    return Response.json(task);
   } catch (error) {
     logDatabaseFailure("PATCH /api/tasks/[id]", error);
     return jsonError(500, "DATABASE_ERROR", "Unable to update the task.");
@@ -98,11 +87,8 @@ export async function DELETE(_request: Request, { params }: TaskRouteContext) {
   if (!isUuid(id)) return jsonError(400, "INVALID_ID", "Task ID must be a UUID.");
 
   try {
-    const { prisma } = await import("@/lib/prisma");
-    const result = await prisma.task.deleteMany({
-      where: ownedTaskWhere(userId, id),
-    });
-    if (result.count === 0) {
+    const deleted = await deleteOwnedTask(userId, id);
+    if (!deleted) {
       return jsonError(404, "NOT_FOUND", "Task was not found.");
     }
     return new Response(null, { status: 204 });

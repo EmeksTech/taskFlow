@@ -35,12 +35,15 @@ export const updateTaskSchema = z
   });
 
 export const taskQuerySchema = z.object({
+  search: z.string().trim().max(200).optional(),
   status: taskStatusSchema.optional(),
   priority: taskPrioritySchema.optional(),
   category: z.string().trim().min(1).optional(),
   assignee: z.string().trim().min(1).optional(),
   dueBefore: z.iso.date().optional(),
   dueAfter: z.iso.date().optional(),
+  page: z.coerce.number().int().min(1).max(100_000).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
   sortBy: z
     .enum([
       "title",

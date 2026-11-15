@@ -188,3 +188,28 @@ The optional unauthenticated API integration check requires a running app in dat
 $env:TASKFLOW_TEST_BASE_URL = "http://localhost:3000"
 npm run test:api-security
 ```
+
+## Classroom API integration
+
+The classroom materials and isolated React + Vite proof of concept are under
+[`docs/`](./docs/) and [`classroom/taskflow-react-poc/`](./classroom/taskflow-react-poc/):
+
+- [Postman classroom guide](./docs/POSTMAN_CLASSROOM_GUIDE.md)
+- [TaskFlow API reference](./docs/TASKFLOW_API_REFERENCE.md)
+- [Classroom architecture](./docs/CLASSROOM_ARCHITECTURE.md)
+- [Instructor demo guide](./docs/INSTRUCTOR_DEMO_GUIDE.md)
+
+The versioned bearer-token API and its classroom guides are documented in:
+
+- [External REST API](./docs/TASKFLOW_EXTERNAL_API.md)
+- [Postman REST API guide](./docs/POSTMAN_REST_API_GUIDE.md)
+- [React API integration](./docs/REACT_API_INTEGRATION.md)
+- [Shared-data classroom demonstration](./docs/CLASSROOM_DEMONSTRATION.md)
+- [Postman collection](./docs/postman/TaskFlow-Classroom.postman_collection.json)
+- [Postman environment template](./docs/postman/TaskFlow-Classroom.postman_environment.json)
+
+The API remains same-origin-only by default. `TASKFLOW_ALLOWED_ORIGINS` is an
+optional server-side exact-origin allowlist for an explicitly trusted Vite
+proxy; it does not enable CORS or bypass Auth.js, CSRF, or task ownership
+checks. Production does not trust local development origins unless an operator
+explicitly configures them.

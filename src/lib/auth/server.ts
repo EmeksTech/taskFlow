@@ -59,7 +59,16 @@ export function isUniqueConstraintError(error: unknown) {
 }
 
 export function logAuthFailure(route: string, error: unknown) {
-  console.error(`[${route}] Authentication operation failed.`, {
-    errorType: error instanceof Error ? error.name : "UnknownError",
-  });
+  const errorType = error instanceof Error ? error.name : "UnknownError";
+  const errorCode =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? ` (${error.code})`
+      : "";
+
+  console.error(
+    `[${route}] Authentication operation failed: ${errorType}${errorCode}.`,
+  );
 }
